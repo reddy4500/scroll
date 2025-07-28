@@ -11,8 +11,11 @@ const volumeTable = document.getElementById('volumeTable');
 const chamberSelect = document.getElementById('chamberSelect');
 const thetaDSpan = document.getElementById('thetaD');
 
+// --- UPDATE AND EVENT HANDLING ---
+
 /**
  * Main update function. Called when the slider value changes.
+ * @param {number} angleDegrees - The crank angle in degrees.
  */
 function update(angleDegrees) {
     const theta = angleDegrees * Math.PI / 180;
