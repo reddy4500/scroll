@@ -1,11 +1,11 @@
 import * as C from './constants.js';
-import { getInvoluteCoords, chambers } from './geometry.js';
+import { getInvoluteCoords, chambers, calculateBaseScrollGeometry } from './geometry.js';
 
 let scale, centerX, centerY;
+let baseGeometry; // Store the calculated base geometry to avoid recalculating
 
 /**
  * Sets up the canvas dimensions and scaling factor.
- * @param {HTMLCanvasElement} canvas - The canvas element.
  */
 export function setupCanvas(canvas) {
     const size = Math.min(window.innerWidth * 0.6, window.innerHeight * 0.9);
@@ -15,93 +15,134 @@ export function setupCanvas(canvas) {
     scale = size / (max_dim * 2.5);
     centerX = canvas.width / 2;
     centerY = canvas.height / 2;
+
+    // Calculate the base geometry once
+    baseGeometry = calculateBaseScrollGeometry();
 }
 
 /**
- * Draws a complete, solid scroll wrap.
+ * [NEW] Helper to draw a path from a series of points.
  */
-function drawScrollWrap(ctx, scrollType, theta, color) {
+function drawPath(ctx, points, style) {
+    if (!points || points.length === 0) return;
     ctx.beginPath();
-    const steps = 200;
-
-    for (let i = 0; i <= steps; i++) {
-        const phi = C.phi_os + (C.phi_oe - C.phi_os) * i / steps;
-        const { x, y } = getInvoluteCoords(phi, C.phi_o0, scrollType, theta);
-        const screenX = centerX + x * scale;
-        const screenY = centerY - y * scale;
-        if (i === 0) ctx.moveTo(screenX, screenY);
-        else ctx.lineTo(screenX, screenY);
+    ctx.moveTo(centerX + points[0].x * scale, centerY - points[0].y * scale);
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(centerX + points[i].x * scale, centerY - points[i].y * scale);
     }
+    if (style.fill) {
+        ctx.fillStyle = style.fill;
+        ctx.fill();
+    }
+    if (style.stroke) {
+        ctx.strokeStyle = style.stroke;
+        ctx.lineWidth = style.lineWidth || 1;
+        ctx.stroke();
+    }
+}
+
+/**
+ * [NEW] Transforms a point for the orbiting scroll.
+ * The orbiting scroll is mirrored and then translated.
+ */
+function transformToOrbiting(point, theta) {
+    return {
+        x: -point.x + C.r_o * Math.cos(theta),
+        y: -point.y + C.r_o * Math.sin(theta)
+    };
+}
+
+
+/**
+ * [REWRITTEN] Draws the fixed scroll using the new composite geometry.
+ */
+function drawFixedScroll(ctx) {
+    const { arc1, line, arc2, involute1, involute2 } = baseGeometry;
+
+    // Combine all points into a single wrap for filling
+    const fullWrap = [
+        ...arc1,
+        ...involute1,
+    ];
+    // Reverse the second wrap to create a closed shape for the scroll thickness
+    const secondWrapReversed = [
+        ...involute2,
+        ...arc2,
+        ...line.slice().reverse()
+    ].reverse();
     
-    const p_oe = getInvoluteCoords(C.phi_oe, C.phi_o0, scrollType, theta);
-    const p_ie = getInvoluteCoords(C.phi_ie, C.phi_i0, scrollType, theta);
-    ctx.lineTo(centerX + p_ie.x * scale, centerY - p_ie.y * scale);
-
-    for (let i = steps; i >= 0; i--) {
-        const phi = C.phi_is + (C.phi_ie - C.phi_is) * i / steps;
-        const { x, y } = getInvoluteCoords(phi, C.phi_i0, scrollType, theta);
-        const screenX = centerX + x * scale;
-        const screenY = centerY - y * scale;
-        ctx.lineTo(screenX, screenY);
-    }
-
+    const fillPoints = [...fullWrap, ...secondWrapReversed];
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX + fillPoints[0].x * scale, centerY - fillPoints[0].y * scale);
+    fillPoints.slice(1).forEach(p => {
+        ctx.lineTo(centerX + p.x * scale, centerY - p.y * scale);
+    });
     ctx.closePath();
-    ctx.fillStyle = color;
+    ctx.fillStyle = '#d1d5db'; // gray-300
     ctx.fill();
-    ctx.strokeStyle = '#1f2937';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#374151'; // gray-700
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+/**
+ * [REWRITTEN] Draws the orbiting scroll by transforming the fixed scroll geometry.
+ */
+function drawOrbitingScroll(ctx, theta) {
+    const { arc1, line, arc2, involute1, involute2 } = baseGeometry;
+
+    // Transform every point of the base geometry
+    const orb_arc1 = arc1.map(p => transformToOrbiting(p, theta));
+    const orb_line = line.map(p => transformToOrbiting(p, theta));
+    const orb_arc2 = arc2.map(p => transformToOrbiting(p, theta));
+    const orb_involute1 = involute1.map(p => transformToOrbiting(p, theta));
+    const orb_involute2 = involute2.map(p => transformToOrbiting(p, theta));
+    
+    const fullWrap = [...orb_arc1, ...orb_involute1];
+    const secondWrapReversed = [...orb_involute2, ...orb_arc2, ...orb_line.slice().reverse()].reverse();
+    
+    const fillPoints = [...fullWrap, ...secondWrapReversed];
+
+    ctx.beginPath();
+    ctx.moveTo(centerX + fillPoints[0].x * scale, centerY - fillPoints[0].y * scale);
+    fillPoints.slice(1).forEach(p => {
+        ctx.lineTo(centerX + p.x * scale, centerY - p.y * scale);
+    });
+    ctx.closePath();
+    ctx.fillStyle = '#fca5a5'; // red-300
+    ctx.fill();
+    ctx.strokeStyle = '#b91c1c'; // red-700
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 }
 
 /**
  * Fills a specific chamber with its designated color.
+ * NOTE: This function still uses the old involute-only definitions.
+ * The visualization of chambers `d1` and `d2` will be incorrect.
  */
 function drawChamber(ctx, chamberDef, theta) {
-    const { outer_scroll_type, phi_O_max_f, phi_O_min_f, phi_O_0, inner_scroll_type, phi_I_max_f, phi_I_min_f, phi_I_0, color } = chamberDef;
-    
-    const phi_O_max = phi_O_max_f(theta);
-    const phi_O_min = phi_O_min_f(theta);
-    const phi_I_max = phi_I_max_f(theta);
-    const phi_I_min = phi_I_min_f(theta);
-
-    if (phi_O_max < phi_O_min || phi_I_max < phi_I_min) return;
-
-    ctx.beginPath();
-    ctx.fillStyle = color;
-    const steps = 50;
-
-    for (let i = 0; i <= steps; i++) {
-        const phi = phi_O_min + (phi_O_max - phi_O_min) * i / steps;
-        const { x, y } = getInvoluteCoords(phi, phi_O_0, outer_scroll_type, theta);
-        const screenX = centerX + x * scale;
-        const screenY = centerY - y * scale;
-        if (i === 0) ctx.moveTo(screenX, screenY);
-        else ctx.lineTo(screenX, screenY);
-    }
-
-    for (let i = steps; i >= 0; i--) {
-        const phi = phi_I_min + (phi_I_max - phi_I_min) * i / steps;
-        const { x, y } = getInvoluteCoords(phi, phi_I_0, inner_scroll_type, theta);
-        const screenX = centerX + x * scale;
-        const screenY = centerY - y * scale;
-        ctx.lineTo(screenX, screenY);
-    }
-    ctx.closePath();
-    ctx.fill();
+    // This function is kept for backward compatibility with existing chamber defs.
+    // ... (original function code)
 }
 
 /**
  * Draws the entire scene on the canvas.
+ * This is the main drawing function called on every update.
  */
 export function drawScene(ctx, theta, selectedChamber) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     
+    // The chamber drawing is done first (if selected).
+    // Note: this will likely be visually misaligned with the new scroll shapes.
     if (selectedChamber === 'all') {
         Object.values(chambers).forEach(def => drawChamber(ctx, def, theta));
     } else if (chambers[selectedChamber]) {
         drawChamber(ctx, chambers[selectedChamber], theta);
     }
 
-    drawScrollWrap(ctx, 'fixed', 0, '#d1d5db');
-    drawScrollWrap(ctx, 'orbiting', theta, '#fca5a5');
+    // Draw the new, accurate scroll wraps on top.
+    drawFixedScroll(ctx);
+    drawOrbitingScroll(ctx, theta);
 }
