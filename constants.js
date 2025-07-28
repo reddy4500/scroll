@@ -19,17 +19,16 @@ export const r_o = r_b * Math.PI - t_s;
 // Conversion factor from m^3 to cm^3 (cc)
 export const m3_to_cc = 1e6;
 
-// --- NEW: Discharge Geometry Constants (from Python script logic) ---
-// These values would typically come from your design data (e.g., the Excel sheet).
-// The Python script enforces a "perfect meshing" condition. We will do the same.
+// --- NEW & CORRECTED: Discharge Geometry Constants ---
+// These values have been adjusted to prevent geometric errors.
+// The arc is now smaller and positioned further out.
 
 // Base parameters for the second arc (outer wrap of the fixed scroll)
-export const ra2 = 0.0015; // Radius in meters (e.g., 1.5mm)
-export const xa2_fixed_center = 0.001; // X-center in meters (e.g., 1.0mm)
-export const ya2_fixed_center = 0.001; // Y-center in meters (e.g., 1.0mm)
+export const ra2 = 0.0005; // Radius in meters (e.g., 0.5mm)
+export const xa2_fixed_center = 0.0025; // X-center in meters (e.g., 2.5mm)
+export const ya2_fixed_center = 0.0025; // Y-center in meters (e.g., 2.5mm)
 
 // Corrected parameters for the first arc (inner wrap) based on perfect-meshing condition
 export const ra1 = ra2 + r_o; // (ra1 = ra2 + orbiting_radius)
 export const xa1_fixed_center = -xa2_fixed_center; // Mirrored center
 export const ya1_fixed_center = -ya2_fixed_center; // Mirrored center
-
