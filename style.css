@@ -1,0 +1,4 @@
+/* Sets the default font for the entire application */
+body {
+    font-family: 'Inter', sans-serif;
+}
