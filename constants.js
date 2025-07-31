@@ -1,9 +1,9 @@
 // --- CONSTANTS AND INPUTS (from Table 3 of Bell, et al., 2014) ---
 
 // Base circle radius (m)
-export const r_b = 0.00286479; 
+export const r_b = 0.0015288; 
 // Scroll height (m)
-export const h = 0.040536;     
+export const h = 0.008538840915200;     
 // Inner involute initial angle (rad)
 export const phi_i0 = 0.0;       
 // Inner involute start angle (rad)
