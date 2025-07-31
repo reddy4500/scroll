@@ -89,8 +89,8 @@
 
     <script>
         // --- CONSTANTS AND INPUTS (from Table 3) ---
-        const r_b = 0.00286479;
-        const h = 0.040536;
+        const r_b = 0.0015288;
+        const h = 0.00853840915200;
         const phi_i0 = 0.0;
         const phi_is = Math.PI;
         const phi_ie = 17.7195;
